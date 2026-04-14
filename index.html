@@ -1150,7 +1150,7 @@
         if (state.phase === "focus" && !isReadyForFocus()) {
           state.lastEncouragement = "Add a goal and finish the setup checklist before starting the focus block.";
           render();
-          return;
+          return false;
         }
 
         if (state.secondsLeft === 0) {
@@ -1158,7 +1158,7 @@
         }
 
         if (state.timerId) {
-          return;
+          return true;
         }
 
         state.isRunning = true;
@@ -1177,6 +1177,8 @@
             renderTimer();
           }
         }, 250);
+
+        return true;
       }
 
       function resetSession() {
@@ -1368,7 +1370,15 @@
         focusPhaseChip.textContent = state.phase === "focus" ? "Focus mode" : "Break mode";
         focusTime.textContent = formatTime(state.secondsLeft);
         focusGoalText.textContent = state.goal.trim() || "Add a study goal to begin";
-        focusPauseButton.textContent = state.isRunning ? "Pause" : "Resume";
+        if (state.isRunning) {
+          focusPauseButton.textContent = "Pause Timer";
+        } else if (state.phase === "focus") {
+          focusPauseButton.textContent =
+            state.secondsLeft === getPhaseDurationSeconds("focus") ? "Start Focus" : "Resume Focus";
+        } else {
+          focusPauseButton.textContent =
+            state.secondsLeft === getPhaseDurationSeconds("break") ? "Start Break" : "Resume Break";
+        }
         focusDistractedButton.disabled = !state.isRunning && state.phase !== "focus";
         focusCopy.textContent = state.phase === "focus"
           ? "Only the essentials are visible now. Stay with one task until this block ends."
@@ -1444,7 +1454,10 @@
           stopTimer();
           state.lastEncouragement = "Timer paused. Take one breath and resume when ready.";
         } else {
-          startTimer();
+          const started = startTimer();
+          if (!started && state.phase === "focus") {
+            focusNote.textContent = "Add a goal and complete the three setup reminders before starting focus mode.";
+          }
         }
         render();
       });
@@ -1467,8 +1480,16 @@
 
       resetSessionButton.addEventListener("click", resetSession);
 
-      enterFocusModeButton.addEventListener("click", () => {
-        setFocusMode(true);
+      enterFocusModeButton.addEventListener("click", async () => {
+        await setFocusMode(true);
+
+        if (!state.isRunning && state.phase === "focus" && isReadyForFocus()) {
+          startTimer();
+        } else if (state.phase === "focus" && !isReadyForFocus()) {
+          focusNote.textContent = "Set one study goal and complete the setup reminders before starting the timer.";
+        }
+
+        render();
       });
 
       exitFocusModeButton.addEventListener("click", () => {
